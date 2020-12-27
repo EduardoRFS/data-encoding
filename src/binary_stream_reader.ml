@@ -377,16 +377,19 @@ let rec read_rec :
       match
         List.find_opt
           (function
-            | Case {tag = Tag tag; _} ->
+            | Case {tag = Tag tag; _} | Lazy_case {tag = Tag tag; _} ->
                 tag = ctag
-            | Case {tag = Json_only; _} ->
+            | Case {tag = Json_only; _} | Lazy_case {tag = Json_only; _} ->
                 false)
           cases
       with
       | None ->
           Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
-          read_rec whole encoding state @@ fun (v, state) -> k (inj v, state) )
+          read_rec whole encoding state @@ fun (v, state) -> k (inj v, state)
+      | Some (Lazy_case {encoding; inj; _}) ->
+          read_rec whole (Lazy.force encoding) state
+          @@ fun (v, state) -> k (inj v, state) )
   | Dynamic_size {kind; encoding = e} ->
       Atom.int kind resume state
       @@ fun (sz, state) ->

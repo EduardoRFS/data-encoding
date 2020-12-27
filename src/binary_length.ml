@@ -94,7 +94,8 @@ let rec length : type x. x Encoding.t -> x -> int =
       let rec length_case = function
         | [] ->
             raise (Write_error No_case_matched)
-        | Case {tag = Json_only; _} :: tl ->
+        | Case {tag = Json_only; _} :: tl
+        | Lazy_case {tag = Json_only; _} :: tl ->
             length_case tl
         | Case {encoding = e; proj; _} :: tl -> (
           match proj value with
@@ -102,6 +103,13 @@ let rec length : type x. x Encoding.t -> x -> int =
               length_case tl
           | Some value ->
               Binary_size.tag_size tag_size + length e value )
+        | Lazy_case {encoding = e; proj; _} :: tl -> (
+            let e = Lazy.force e in
+            match proj value with
+            | None ->
+                length_case tl
+            | Some value ->
+                Binary_size.tag_size tag_size + length e value )
       in
       length_case cases
   | Mu {kind = `Dynamic; fix; _} ->
@@ -135,7 +143,8 @@ let rec length : type x. x Encoding.t -> x -> int =
       let rec length_case = function
         | [] ->
             raise (Write_error No_case_matched)
-        | Case {tag = Json_only; _} :: tl ->
+        | Case {tag = Json_only; _} :: tl
+        | Lazy_case {tag = Json_only; _} :: tl ->
             length_case tl
         | Case {encoding = e; proj; _} :: tl -> (
           match proj value with
@@ -143,6 +152,13 @@ let rec length : type x. x Encoding.t -> x -> int =
               length_case tl
           | Some value ->
               Binary_size.tag_size tag_size + length e value )
+        | Lazy_case {encoding = e; proj; _} :: tl -> (
+            let e = Lazy.force e in
+            match proj value with
+            | None ->
+                length_case tl
+            | Some value ->
+                Binary_size.tag_size tag_size + length e value )
       in
       length_case cases
   | Mu {kind = `Variable; fix; _} ->

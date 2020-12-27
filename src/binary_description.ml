@@ -270,9 +270,9 @@ let describe (type x) (encoding : x Encoding.t) =
       @@ List.fold_left
            (fun acc case ->
              match case with
-             | Case {tag = Json_only; _} ->
+             | Case {tag = Json_only; _} | Lazy_case {tag = Json_only; _} ->
                  acc
-             | Case {tag = Tag tag; _} ->
+             | Case {tag = Tag tag; _} | Lazy_case {tag = Tag tag; _} ->
                  (tag, case) :: acc)
            []
            cases
@@ -285,11 +285,23 @@ let describe (type x) (encoding : x Encoding.t) =
     in
     let (cases, references) =
       List.fold_right
-        (fun (tag, Case case) (cases, references) ->
+        (fun (tag, case) (cases, references) ->
+          let fields encoding = fields None recursives references encoding in
           let (fields, references) =
-            fields None recursives references case.encoding.encoding
+            match case with
+            | Case {encoding; _} ->
+                fields encoding.encoding
+            | Lazy_case {encoding; _} ->
+                fields (Lazy.force encoding).encoding
           in
-          ((tag, Some case.title, tag_field :: fields) :: cases, references))
+          let title =
+            match case with
+            | Case {title; _} ->
+                title
+            | Lazy_case {title; _} ->
+                title
+          in
+          ((tag, Some title, tag_field :: fields) :: cases, references))
         cases
         ([], references)
     in

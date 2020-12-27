@@ -299,7 +299,8 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
       let rec write_case = function
         | [] ->
             raise No_case_matched
-        | Case {tag = Json_only; _} :: tl ->
+        | Case {tag = Json_only; _} :: tl
+        | Lazy_case {tag = Json_only; _} :: tl ->
             write_case tl
         | Case {encoding = e; proj; tag = Tag tag; _} :: tl -> (
           match proj value with
@@ -308,6 +309,14 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
           | Some value ->
               Atom.tag tag_size state tag ;
               write_rec e state value )
+        | Lazy_case {encoding = e; proj; tag = Tag tag; _} :: tl -> (
+            let e = Lazy.force e in
+            match proj value with
+            | None ->
+                write_case tl
+            | Some value ->
+                Atom.tag tag_size state tag ;
+                write_rec e state value )
       in
       write_case cases
   | Dynamic_size {kind; encoding = e} ->

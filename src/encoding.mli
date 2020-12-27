@@ -148,6 +148,15 @@ and 'a case =
       tag : case_tag;
     }
       -> 't case
+  | Lazy_case : {
+      title : string;
+      description : string option;
+      encoding : 'a t Lazy.t;
+      proj : 't -> 'a option;
+      inj : 'a -> 't;
+      tag : case_tag;
+    }
+      -> 't case
 
 and 'a t = {
   encoding : 'a desc;
@@ -422,6 +431,15 @@ val case :
   ?description:string ->
   case_tag ->
   'a encoding ->
+  ('t -> 'a option) ->
+  ('a -> 't) ->
+  't case
+
+val lazy_case :
+  title:string ->
+  ?description:string ->
+  case_tag ->
+  'a encoding Lazy.t ->
   ('t -> 'a option) ->
   ('a -> 't) ->
   't case

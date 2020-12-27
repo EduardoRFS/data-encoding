@@ -186,6 +186,15 @@ and 'a case =
       tag : case_tag;
     }
       -> 't case
+  | Lazy_case : {
+      title : string;
+      description : string option;
+      encoding : 'a t Lazy.t;
+      proj : 't -> 'a option;
+      inj : 'a -> 't;
+      tag : case_tag;
+    }
+      -> 't case
 
 and 'a t = {
   encoding : 'a desc;
@@ -562,7 +571,13 @@ let rec is_obj : type a. a t -> bool =
   | Dynamic_size {encoding = e; _} ->
       is_obj e
   | Union {cases; _} ->
-      List.for_all (fun (Case {encoding = e; _}) -> is_obj e) cases
+      List.for_all
+        (function
+          | Case {encoding = e; _} ->
+              is_obj e
+          | Lazy_case {encoding = e; _} ->
+              is_obj (Lazy.force e))
+        cases
   | Empty ->
       true
   | Ignore ->
@@ -590,7 +605,13 @@ let rec is_tup : type a. a t -> bool =
   | Dynamic_size {encoding = e; _} ->
       is_tup e
   | Union {cases; _} ->
-      List.for_all (function Case {encoding = e; _} -> is_tup e) cases
+      List.for_all
+        (function
+          | Case {encoding = e; _} ->
+              is_tup e
+          | Lazy_case {encoding = e; _} ->
+              is_tup (Lazy.force e))
+        cases
   | Mu {fix; _} ->
       is_tup (fix e)
   | Splitted {is_tup; _} ->
@@ -754,7 +775,10 @@ let check_cases tag_size cases =
   let max_tag = match tag_size with `Uint8 -> 256 | `Uint16 -> 256 * 256 in
   ignore
   @@ List.fold_left
-       (fun others (Case {tag; _}) ->
+       (fun others case ->
+         let tag =
+           match case with Case {tag; _} -> tag | Lazy_case {tag; _} -> tag
+         in
          match tag with
          | Json_only ->
              others
@@ -772,12 +796,20 @@ let check_cases tag_size cases =
 
 let union ?(tag_size = `Uint8) cases =
   check_cases tag_size cases ;
-  let kinds = List.map (fun (Case {encoding; _}) -> classify encoding) cases in
+  let kinds =
+    List.map
+      (function
+        | Case {encoding; _} -> classify encoding | Lazy_case _ -> `Variable)
+      cases
+  in
   let kind = Kind.merge_list tag_size kinds in
   make @@ Union {kind; tag_size; cases}
 
 let case ~title ?description tag encoding proj inj =
   Case {title; description; encoding; proj; inj; tag}
+
+let lazy_case ~title ?description tag encoding proj inj =
+  Lazy_case {title; description; encoding; proj; inj; tag}
 
 let rec is_nullable : type t. t encoding -> bool =
  fun e ->
@@ -837,7 +869,13 @@ let rec is_nullable : type t. t encoding -> bool =
   | Tups _ ->
       false
   | Union {cases; _} ->
-      List.exists (fun (Case {encoding = e; _}) -> is_nullable e) cases
+      List.exists
+        (function
+          | Case {encoding = e; _} ->
+              is_nullable e
+          | Lazy_case {encoding = e; _} ->
+              is_nullable (Lazy.force e))
+        cases
   | Mu {fix; _} ->
       is_nullable (fix e)
   | Conv {encoding = e; _} ->

@@ -480,6 +480,15 @@ module Encoding : sig
     ('a -> 't) ->
     't case
 
+  val lazy_case :
+    title:string ->
+    ?description:string ->
+    case_tag ->
+    'a encoding Lazy.t ->
+    ('t -> 'a option) ->
+    ('a -> 't) ->
+    't case
+
   (** Create a single encoding from a series of cases.
 
       In JSON, all cases are tried one after the other. The caller must

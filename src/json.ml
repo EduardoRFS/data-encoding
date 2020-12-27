@@ -147,24 +147,43 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
                tag_size;
                cases =
                  List.map
-                   (fun (Case
-                          {
-                            title;
-                            description;
-                            encoding;
-                            proj = proj';
-                            inj = inj';
-                            tag;
-                          }) ->
-                     Case
-                       {
-                         encoding;
-                         title;
-                         description;
-                         proj = (fun x -> proj' (proj x));
-                         inj = (fun x -> inj (inj' x));
-                         tag;
-                       })
+                   (function
+                     | Case
+                         {
+                           title;
+                           description;
+                           encoding;
+                           proj = proj';
+                           inj = inj';
+                           tag;
+                         } ->
+                         Case
+                           {
+                             encoding;
+                             title;
+                             description;
+                             proj = (fun x -> proj' (proj x));
+                             inj = (fun x -> inj (inj' x));
+                             tag;
+                           }
+                     | Lazy_case
+                         {
+                           title;
+                           description;
+                           encoding;
+                           proj = proj';
+                           inj = inj';
+                           tag;
+                         } ->
+                         Case
+                           {
+                             encoding = Lazy.force encoding;
+                             title;
+                             description;
+                             proj = (fun x -> proj' (proj x));
+                             inj = (fun x -> inj (inj' x));
+                             tag;
+                           })
                    cases;
              }
     | e ->
@@ -202,23 +221,41 @@ and lift_union_in_pair :
              tag_size;
              cases =
                List.map
-                 (fun (Case
-                        {title; description; encoding = e2; proj; inj; tag}) ->
-                   Case
-                     {
-                       encoding = lift_union_in_pair b p e1 e2;
-                       title;
-                       description;
-                       proj =
-                         (fun (x, y) ->
-                           match proj y with
-                           | None ->
-                               None
-                           | Some y ->
-                               Some (x, y));
-                       inj = (fun (x, y) -> (x, inj y));
-                       tag;
-                     })
+                 (function
+                   | Case {title; description; encoding = e2; proj; inj; tag}
+                     ->
+                       Case
+                         {
+                           encoding = lift_union_in_pair b p e1 e2;
+                           title;
+                           description;
+                           proj =
+                             (fun (x, y) ->
+                               match proj y with
+                               | None ->
+                                   None
+                               | Some y ->
+                                   Some (x, y));
+                           inj = (fun (x, y) -> (x, inj y));
+                           tag;
+                         }
+                   | Lazy_case
+                       {title; description; encoding = e2; proj; inj; tag} ->
+                       Case
+                         {
+                           encoding = lift_union_in_pair b p e1 (Lazy.force e2);
+                           title;
+                           description;
+                           proj =
+                             (fun (x, y) ->
+                               match proj y with
+                               | None ->
+                                   None
+                               | Some y ->
+                                   Some (x, y));
+                           inj = (fun (x, y) -> (x, inj y));
+                           tag;
+                         })
                  cases;
            }
   | ({encoding = Union {tag_size; cases; _}; _}, e2) ->
@@ -229,23 +266,41 @@ and lift_union_in_pair :
              tag_size;
              cases =
                List.map
-                 (fun (Case
-                        {title; description; encoding = e1; proj; inj; tag}) ->
-                   Case
-                     {
-                       encoding = lift_union_in_pair b p e1 e2;
-                       title;
-                       description;
-                       proj =
-                         (fun (x, y) ->
-                           match proj x with
-                           | None ->
-                               None
-                           | Some x ->
-                               Some (x, y));
-                       inj = (fun (x, y) -> (inj x, y));
-                       tag;
-                     })
+                 (function
+                   | Case {title; description; encoding = e1; proj; inj; tag}
+                     ->
+                       Case
+                         {
+                           encoding = lift_union_in_pair b p e1 e2;
+                           title;
+                           description;
+                           proj =
+                             (fun (x, y) ->
+                               match proj x with
+                               | None ->
+                                   None
+                               | Some x ->
+                                   Some (x, y));
+                           inj = (fun (x, y) -> (inj x, y));
+                           tag;
+                         }
+                   | Lazy_case
+                       {title; description; encoding = e1; proj; inj; tag} ->
+                       Case
+                         {
+                           encoding = lift_union_in_pair b p (Lazy.force e1) e2;
+                           title;
+                           description;
+                           proj =
+                             (fun (x, y) ->
+                               match proj x with
+                               | None ->
+                                   None
+                               | Some x ->
+                                   Some (x, y));
+                           inj = (fun (x, y) -> (inj x, y));
+                           tag;
+                         })
                  cases;
            }
   | (e1, e2) ->
@@ -367,6 +422,9 @@ and case_json : type a. a Encoding.case -> a Json_encoding.case =
   function
   | Encoding.Case {encoding = e; proj; inj; tag = _; title; description} ->
       case ~title ?description (get_json e) proj inj
+  | Encoding.Lazy_case {encoding = e; proj; inj; tag = _; title; description}
+    ->
+      case ~title ?description (get_json @@ Lazy.force e) proj inj
 
 and get_json : type a. a Encoding.t -> a Json_encoding.encoding =
  fun e ->
